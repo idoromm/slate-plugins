@@ -1,4 +1,3 @@
-
 import Promise from 'es6-promise'
 import isImage from 'is-image'
 import isUrl from 'is-url'
@@ -6,7 +5,7 @@ import logger from 'slate-dev-logger'
 import mime from 'mime-types'
 import loadImageFile from './load-image-file'
 import { extname } from 'path'
-import { getEventTransfer } from 'slate-react'
+import { findNode, getEventRange, getEventTransfer, setEventTransfer } from 'slate-react'
 
 /**
  * Insert images on drop or paste.
@@ -64,6 +63,7 @@ function DropOrPasteImages(options = {}) {
     switch (transfer.type) {
       case 'files': return onInsertFiles(event, change, editor, transfer)
       case 'html': return onInsertHtml(event, change, editor, transfer)
+      case 'node': return onInsertNode(event, change, editor, transfer)
       case 'text': return onInsertText(event, change, editor, transfer)
     }
   }
@@ -127,6 +127,35 @@ function DropOrPasteImages(options = {}) {
       const c = editor.value.change()
       if (target) c.select(target)
       asyncApplyChange(c, editor, file)
+    })
+
+    return true
+  }
+
+  /**
+   * On drop or paste slate node.
+   *
+   * @param {Event} event
+   * @param {Change} change
+   * @param {Editor} editor
+   * @param {Object} transfer
+   * @return {Boolean}
+   */
+
+  function onInsertNode(event, change, editor, transfer) {
+    const { value } = change
+    const targetNode = findNode(event.target, value)
+    const targetRange = getEventRange(event, value)
+
+    // expected image src
+    const src = transfer.text
+
+    loadImageFile(src, (err, file) => {
+      if (err) return
+      change.moveToRangeOf(targetNode)
+        .moveOffsetsTo(targetRange.anchorOffset, targetRange.focusOffset)
+        .removeNodeByKey(transfer.node.key)
+      asyncApplyChange(change, editor, file)
     })
 
     return true
